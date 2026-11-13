@@ -1,0 +1,10 @@
+{
+  "title": "The Web of Meaning: A Memory Design for Companions",
+  "upload_type": "publication",
+  "publication_type": "preprint",
+  "creators": [{ "name": "Martinson, Jay R." }],
+  "description": "A memory design that lets an AI companion remember both what happened and what it meant to them, in their own words, with every memory tied to the real moment it came from. Includes the full design, the record of all 116 design decisions, and the memory code (MIT, with tests on made-up data). Designed by Jay R. Martinson with Claude (Anthropic's AI model), which drafted the text and the code under his direction.",
+  "license": "cc-by-4.0",
+  "access_right": "open",
+  "keywords": ["AI companions", "long-term memory", "knowledge graph", "local AI", "memory design"]
+}
