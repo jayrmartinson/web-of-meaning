@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 import { lockForThisPC, unlockOnThisPC } from "./lock.mjs";
 import { seal, unseal } from "./seal.mjs";
-import { fileChunks } from "./librarian.mjs";
+import { fileChunks, conversationFiles } from "./librarian.mjs";
 import { loadMind, mindStarted, moments as lifeMoments } from "./mind.mjs";
 import { machineLike } from "./machine.mjs";
 import { probeOf, foldWidth, joinNoSpace, dropPossessive, minNameLength, namePattern, foundAt, hasNoSpaceScript, wordsIn, hasWordFrom, STOP_ALL, OTHER_WORDS, NEW_WORDS, CHARACTER_WORDS, FIRST_PERSON_OTHER, selfWords, selfWithWords, isNoneOther, isSameOther, AND_SPLIT, monthIndex } from "./lang.mjs";
@@ -42,9 +42,9 @@ const KIND_DEFS = {
     pet: "a specific animal with its own name and ways (not animals in general)",
     group: "people or animals spoken of together as one (never one person, never a building)",
     place: "a real or online place that holds memories (never the thing that happened there)",
-    moment: "a whole day or a one-time turning point that stands out on its own (never a single conversation or hour, and never a story told about something else)",
+    moment: "a single turning point, milestone, or standout event (including one inside a single pivotal conversation, or one continuous event crossing midnight)—never routine small talk, and never a story told about someone else",
     ritual: "something done again and again that carries meaning in my life, or meant to be (never a one-time day)",
-    stretch: "weeks or months with a tone of their own, hard or good (never a single day)",
+    stretch: "a multi-day, multi-week, or multi-month period (more than one continuous event/day) with a unifying tone or ongoing effort of its own. Unrelated routine days with no shared tone do not become a dot.",
     inside_joke: "a private joke, phrase, nickname or running bit shared with someone in my life (never a general hobby or topic)",
     thing: "an object, project, goal or value that carries weight (never a passing topic)",
 };
@@ -1500,6 +1500,8 @@ async function growWebInner({ root, mem, letter, ask, embed, inTime, minutesLeft
     catch (e) {
         log(`her web couldn't list her Shelf's pieces: ${e.message}`);
     }
+    if (allPieces.length)
+        try { saveActiveDays(root, mem, allPieces); } catch (e) { log(`her active days couldn't be kept: ${e.message}`); }
     const readTo = new Map(), addRead = (rel, ab) => { if (!readTo.has(rel))
         readTo.set(rel, []); readTo.get(rel).push(ab); };
     for (const id of done) {
@@ -1613,6 +1615,7 @@ async function growWebInner({ root, mem, letter, ask, embed, inTime, minutesLeft
             const linkDir = nearLinks.length ? nearLinks.map((l) => `${l.a} -- ${l.b} (${hubName(l.a)} and ${hubName(l.b)}): ${liveHistory(l, aside).filter((e) => e.until === null).filter((e, i, a) => a.length <= 3 || i === 0 || i >= a.length - 2).map((e) => `"${excerpt(e.note, 220)}"${e.notes?.length ? ` … latest: "${excerpt(e.notes[e.notes.length - 1].note, 160)}"` : ""}${e.byExcerpt?.length && thenParts(e, w).length ? ` [you then: ${thenParts(e, w).join(" / ")}]` : e.feel?.length && (e.then || e.tape) ? ` [you then: ${e.feel.join(", ")}]` : ""} (since ${label(e.from)})`).join("; ") || "(no open feeling)"}`).join("\n") : "(none of your links touch this yet)";
             return `You are tending the web of your memories: the things in your life, and the links between them, each holding what that connection means to you.\n\n` +
                 `The kinds of dots:\n${TYPES.map((t) => `- ${t}: ${KIND_DEFS[t]}`).join("\n")}\n\n` +
+                `If an ongoing experience spans multiple days, file it as a stretch. Only create a separate first-class moment dot alongside it if the source text contains a distinct, referable name or title for that sub-event (e.g., 'Getting the Keys,' 'the call with Maya'); unnamed realizations or emotional peaks stay inside the stretch.\n\n` +
                 `${who} and you are not dots in this web. Your life is the space the whole web lives in. When something is about him or about you, name the piece of your life it is, in your own words, never just "${who}" or "me". When a memory is between ${who} (or you) and one person or pet, connect that person or pet directly to the ritual, stretch, inside joke or thing they share. Link two existing dots directly when a conversation connects them. Do not make a new moment dot only to hold the conversation. Never add a place just to have a second end.\n\n` +
                 (names ? `Names in your life, spelled right (use these spellings, and give each its own dot when it comes up):\n${names}\n\n` : "") +
                 `The dots already in your web:\n${hubDir}\n\nLinks you already have around these (with how you felt at the time):\n${linkDir}\n\n` +
@@ -1940,8 +1943,78 @@ export function isYoung(w, h) {
     return true;
 }
 const HALF_LIFE = 365;
-function weightOf(l, today) { const d = l.last ? daysBetween(l.last, today) : 0; return l.strength * Math.pow(0.5, d / HALF_LIFE); }
-export function personalizedPageRank(w, seeds, { damping = 0.5, iters = 30, today = dayOf(new Date()), asideR = new Set() } = {}) {
+// Salience for ranking only (v1.2, after Mnemos). A link's last touch is the later of its last night entry and the day the
+// companion last opened it by its mark (web-visits.sealed). Cooling counts active days, not calendar days: a day with a
+// Shelf file named for it, a day the night found pieces on (kept in web-active-days.sealed), a day in the web, or a day she
+// opened a link. Days the computer was off don't age a memory. Shelf files are listed, never read, while she looks.
+// Nothing stored changes: then, now, the links and the log are only read.
+const openedDayOf = (opened, id) => String((opened || {})[id] || "").slice(0, 10);
+const lastTouch = (l, opened) => [l.last || "", openedDayOf(opened, l.id)].sort().pop();
+const upperIndex = (xs, x) => { let lo = 0, hi = xs.length; while (lo < hi) { const m = (lo + hi) >> 1; if (xs[m] <= x) lo = m + 1; else hi = m; } return lo; };
+const activeBetween = (days, a, b) => Math.max(0, upperIndex(days, b) - upperIndex(days, a));   // active days d with a < d <= b
+function weightOf(l, today, sal = null) {
+    const last = lastTouch(l, sal?.opened);
+    const d = !last ? 0 : sal?.activeDays ? activeBetween(sal.activeDays, last, today) : daysBetween(last, today);
+    return l.strength * Math.pow(0.5, d / HALF_LIFE);
+}
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const activeDaysFile = (root) => join(root, "Mind", "web-active-days.sealed");
+const HEAD_DAY = /^\\?\u200B?\[[A-Za-z][A-Za-z0-9 _-]*\]\s*\(([A-Z][a-z]{2}) (\d{1,2}), (\d{4})[^)]*\):\s*$/gm;
+const MON3 = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12 };
+function saveActiveDays(root, mem, pieces) {
+    const s = new Set(pieces.map((x) => x.day));
+    for (const rel of new Set(pieces.map((x) => x.rel)))
+        try {
+            const { text } = fileChunks(root, mem, rel), heads = [...text.matchAll(HEAD_DAY)];
+            if ((text.match(/^\\?\u200B?\[[A-Za-z][A-Za-z0-9 _-]*\]\s*:?\s*$/gm) || []).length > heads.length)
+                continue;   // entry 287: undated messages; any dates inside belong to pasted older text (the pieces keep the file's date)
+            for (const m of heads)
+                if (MON3[m[1]]) s.add(`${m[3]}-${String(MON3[m[1]]).padStart(2, "0")}-${String(m[2]).padStart(2, "0")}`);
+        }
+        catch { }
+    const days = [...s].filter((d) => DAY_RE.test(String(d))).sort();
+    mkdirSync(dirname(activeDaysFile(root)), { recursive: true });
+    const tmp = `${activeDaysFile(root)}.${process.pid}-${Math.random().toString(36).slice(2, 8)}.tmp`;
+    writeFileSync(tmp, seal(webKey(root), JSON.stringify(days)), "utf8");
+    swap(tmp, activeDaysFile(root));
+}
+const nightDaysCache = new Map();
+function nightDays(root) {
+    try {
+        const st = statSync(activeDaysFile(root)), stamp = `${st.mtimeMs}|${st.size}`, c = nightDaysCache.get(root);
+        if (c && c.stamp === stamp)
+            return c.days;
+        const days = JSON.parse(unseal(webKey(root), readFileSync(activeDaysFile(root), "utf8")));
+        nightDaysCache.set(root, { stamp, days });
+        return days;
+    }
+    catch {
+        return [];
+    }
+}
+function activeDaysOf(root, mem, w, opened) {
+    const s = new Set(nightDays(root));
+    if (mem)
+        try {
+            for (const rel of conversationFiles(root, mem)) {
+                const m = /(\d{4}-\d{2}-\d{2})/.exec(String(rel).split("/").pop());
+                if (m) s.add(m[1]);
+            }
+        }
+        catch { }
+    for (const l of w.links) {
+        if (l.last) s.add(l.last);
+        for (const e of l.history || []) { if (e.from) s.add(String(e.from).slice(0, 10)); if (e.until) s.add(String(e.until).slice(0, 10)); }
+    }
+    for (const v of Object.values(opened || {})) s.add(String(v).slice(0, 10));
+    return [...s].filter((d) => DAY_RE.test(d)).sort();
+}
+export const _salience = { weightOf: (l, today, sal) => weightOf(l, today, sal), activeBetween, lastTouch, activeDaysOf: (root, mem, w, opened) => activeDaysOf(root, mem, w, opened), activeDaysFile };
+function salienceOf(root, mem, w) {
+    const opened = loadVisits(root)?.opened || {};
+    return { opened, activeDays: activeDaysOf(root, mem, w, opened) };
+}
+export function personalizedPageRank(w, seeds, { damping = 0.5, iters = 30, today = dayOf(new Date()), asideR = new Set(), sal = null } = {}) {
     const live = w.links.filter((l) => !w.aside.includes(l.id) && !w.aside.includes(l.a) && !w.aside.includes(l.b) && liveHistory(l, asideR).length);
     const nbr = new Map();
     for (const h of w.hubs)
@@ -1949,7 +2022,7 @@ export function personalizedPageRank(w, seeds, { damping = 0.5, iters = 30, toda
     const add = (u, v, wt) => nbr.get(u)?.push([v, wt]);
     const young = new Set(w.hubs.filter((h) => isYoung(w, h)).map((h) => h.id));
     for (const l of live) {
-        const wt = weightOf(l, today);
+        const wt = weightOf(l, today, sal);
         add(l.a, l.b, wt * (young.has(l.b) ? 0.25 : 1));
         add(l.b, l.a, wt * (young.has(l.a) ? 0.25 : 1));
     }
@@ -2126,7 +2199,8 @@ export async function walkWeb(root, mem, args = {}, { embed = null } = {}) {
     let qv = null;
     const qText = String(args.about || "").trim();
     if (!qText) {
-        const top = w.links.filter(live).sort((x, y) => weightOf(y, dayOf(new Date())) - weightOf(x, dayOf(new Date()))).slice(0, Math.min(12, Number(args.last) || 8));
+        const sal = salienceOf(root, mem, w), today0 = dayOf(new Date());
+        const top = w.links.filter(live).sort((x, y) => weightOf(y, today0, sal) - weightOf(x, today0, sal)).slice(0, Math.min(12, Number(args.last) || 8));
         return top.length ? head + `Your web: ${w.hubs.length} dots and ${w.links.length} links. The strongest and most recent:\n\n` + top.map((l) => threadText(l)).join("\n\n") : "Your web has no links yet.";
     }
     if (embed) {
@@ -2157,10 +2231,11 @@ export async function walkWeb(root, mem, args = {}, { embed = null } = {}) {
         if (!seedB.length)
             return `Nothing in your web is called "${args.and}" yet.`;
     }
-    const pr = personalizedPageRank(w, seedB.length ? [...seedA, ...seedB] : seedA, { asideR });
+    const sal = salienceOf(root, mem, w);
+    const pr = personalizedPageRank(w, seedB.length ? [...seedA, ...seedB] : seedA, { asideR, sal });
     let rank = [...pr.entries()].filter(([id]) => !seedA.includes(id) && !seedB.includes(id) && byId.has(id) && !w.aside.includes(id));
     if (seedB.length) {
-        const pa = personalizedPageRank(w, seedA, { asideR }), pb = personalizedPageRank(w, seedB, { asideR });
+        const pa = personalizedPageRank(w, seedA, { asideR, sal }), pb = personalizedPageRank(w, seedB, { asideR, sal });
         rank = rank.map(([id]) => [id, Math.min(pa.get(id) || 0, pb.get(id) || 0)]).filter(([, s]) => s > 0);
     }
     rank.sort((x, y) => y[1] - x[1]);
@@ -2208,8 +2283,8 @@ export async function webLinksFor(root, query, { embed = null, web = null } = {}
     }
     if (!seeds.length)
         return [];
-    const today = dayOf(new Date()), touch = (l) => (seeds.includes(l.a) ? 1 : 0) + (seeds.includes(l.b) ? 1 : 0);
-    return liveLinks(w, asideR).filter((l) => touch(l)).sort((x, y) => touch(y) - touch(x) || weightOf(y, today) - weightOf(x, today)).map((l) => ({ id: l.id, text: linkLine(w, l, asideR) }));
+    const today = dayOf(new Date()), touch = (l) => (seeds.includes(l.a) ? 1 : 0) + (seeds.includes(l.b) ? 1 : 0), sal = salienceOf(root, null, w);
+    return liveLinks(w, asideR).filter((l) => touch(l)).sort((x, y) => touch(y) - touch(x) || weightOf(y, today, sal) - weightOf(x, today, sal)).map((l) => ({ id: l.id, text: linkLine(w, l, asideR) }));
 }
 export function readingWeb(root) { if (!webStarted(root))
     return null; const w = loadWeb(root); w.aside ||= []; try {
@@ -2369,8 +2444,8 @@ function datePart(s) {
         return { y: m[1] ? +m[1] : null, m: +m[2] - 1, d: m[3] ? +m[3] : null };
     if ((m = /^(\d{4})\s*[年년]$/u.exec(s)))
         return { y: +m[1], m: null, d: null };
-    if ((m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s)))
-        return { y: +m[3], m: +m[2] - 1, d: +m[1] };
+    if ((m = /^(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})$/.exec(s)))
+        return { y: m[3].length === 2 ? 2000 + +m[3] : +m[3], m: +m[2] - 1, d: +m[1] };
     if ((m = /^(\p{L}[\p{L}\p{M}]*\.?)(?: (\d{4}))?$/u.exec(s)) && mon(m[1]) !== undefined)
         return { y: m[2] ? +m[2] : null, m: mon(m[1]), d: null };
     if ((m = /^(\p{L}[\p{L}\p{M}]*\.?) (\d{1,2})(?: (\d{4}))?$/u.exec(s)) && mon(m[1]) !== undefined)
@@ -2506,7 +2581,8 @@ export function lookInwardWeb(root, mem, args = {}, { cards = {}, now = new Date
     const changed = live.map((l) => { const h = liveHistory(l, asideR), i = h.map((e) => !!e.until).lastIndexOf(true); return i >= 0 ? { l, old: h[i], next: h.slice(i + 1).find((e) => e.until === null) || h[i + 1] } : null; }).filter(Boolean).sort((x, y) => (x.old.until < y.old.until ? 1 : x.old.until > y.old.until ? -1 : x.l.id < y.l.id ? -1 : 1));
     if (changed.length)
         parts.push(`Where a feeling changed (newest first):\n${changed.slice(0, 6).map(({ l, old, next }) => `— ${l.id} · ${ends(l)}${peekMark(l.id)}: until ${label(old.until)}${feelLabel(old, w) ? ` (${feelLabel(old, w)})` : ""}${next ? `; since ${label(next.from)}${feelLabel(next, w) ? ` (${feelLabel(next, w)})` : ""}` : ""}`).join("\n")}${changed.length > 6 ? `\n(and ${changed.length - 6} more)` : ""}`);
-    const close = [...live].sort((x, y) => weightOf(y, today) - weightOf(x, today) || (x.id < y.id ? -1 : 1)).slice(0, 8);
+    const sal = salienceOf(root, mem, w);
+    const close = [...live].sort((x, y) => weightOf(y, today, sal) - weightOf(x, today, sal) || (x.id < y.id ? -1 : 1)).slice(0, 8);
     parts.push(`Your closest connections:\n${close.map((l) => `— ${l.id} · ${ends(l)} (${strengthWord(l.strength)})${peekMark(l.id)}`).join("\n")}`);
     const vs = loadVisits(root), opened = vs?.opened || {}, order = vs?.listed || {};
     const openedDay = (id) => String(opened[id] || "").slice(0, 10);

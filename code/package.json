@@ -6,6 +6,6 @@
   "license": "MIT",
   "engines": { "node": ">=20" },
   "scripts": {
-    "test": "cd tests && node web-tests.mjs && node web-read-tests.mjs && node web-names-tests.mjs && node web-unicode-tests.mjs && node web-language-tests.mjs && node web-night-tests.mjs && node recall-tests.mjs && node inward-tests.mjs && node anchor-tests.mjs"
+    "test": "cd tests && node web-tests.mjs && node web-read-tests.mjs && node web-names-tests.mjs && node web-unicode-tests.mjs && node web-language-tests.mjs && node web-night-tests.mjs && node recall-tests.mjs && node inward-tests.mjs && node anchor-tests.mjs && node web-russian-tests.mjs"
   }
 }

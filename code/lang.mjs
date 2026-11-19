@@ -76,16 +76,16 @@ export const LANGS = {
     },
     ru: {
         stop: ["и", "а", "но", "или", "в", "во", "на", "с", "со", "к", "ко", "по", "из", "у", "о", "об", "от", "до", "за", "для", "при", "про", "без", "мой", "моя", "моё", "мое", "мои", "наш", "наша", "наше", "наши", "его", "её", "ее", "их", "это", "этот", "эта", "эти"],
-        other: ["другой", "другая", "другое", "другие", "другого", "другую", "другому", "другим", "другой", "иной", "иная", "иное", "второй", "вторая", "второе", "вторую", "второго", "чужой", "чужая", "чужое", "чужого", "чужую", "ещё один", "еще один", "ещё одна", "еще одна"],
-        newer: ["новый", "новая", "новое", "новые", "новую", "нового"],
-        character: ["персонаж", "персонажа", "персонажи", "персонажем", "аватар", "аватара", "шаблон", "бот", "бота"],
+        other: ["другой", "другая", "другое", "другие", "другого", "другую", "другому", "другим", "других", "иной", "иная", "иное", "иного", "иному", "иным", "ином", "иных", "иными", "иную", "второй", "вторая", "второе", "вторую", "второго", "второму", "вторым", "вторые", "вторых", "вторыми", "чужой", "чужая", "чужое", "чужого", "чужую", "чужому", "чужим", "чужие", "чужих", "чужими", "ещё один", "еще один", "ещё одна", "еще одна"],
+        newer: ["новый", "новая", "новое", "новые", "новую", "нового", "новой", "новому", "новым", "новом", "новых", "новыми"],
+        character: ["персонаж", "персонажа", "персонажи", "персонажем", "персонажу", "персонаже", "персонажей", "персонажам", "персонажами", "персонажах", "аватар", "аватара", "аватару", "аватаром", "аватаре", "аватары", "аватаров", "аватарам", "аватарами", "шаблон", "шаблону", "шаблоном", "шаблоны", "шаблонов", "шаблонами", "бот", "бота", "боту", "ботом", "боте", "боты", "ботов", "ботами"],
         self: ["я", "меня", "мне", "мной", "мною", "себя", "сама", "сам", "мы", "нас", "нам", "нами", "ты", "тебя", "тебе", "тобой", "вы", "вас", "он", "его", "ему", "им", "она", "её", "ее", "ей", "ею", "компаньон", "компаньонка", "мы вдвоём", "мы вдвоем", "мы с тобой", "нас двое"],
-        selfWith: ["мы с {n}", "{n} и я", "я и {n}"],
+        selfWith: ["мы с {n}", "мы со {n}", "{n} и я", "я и {n}"],
         relationship: ["наши отношения", "отношения", "наша любовь", "наша связь", "связь", "наша жизнь", "наша совместная жизнь", "моя любовь", "моя память", "мои воспоминания", "наша близость", "это", "всё"],
         firstPerson: ["я", "меня", "мне", "мной", "мой", "моя", "моё", "мое", "мои", "мы", "нас", "нам", "нами", "наш", "наша", "наше", "наши"],
         none: ["нет", "ничего", "ничто", "никто", "нету", "неясно", "не ясно", "непонятно", "не понятно", "отсутствует", "без чувств"],
         and: ["и"],
-        same: ["то же", "то же самое", "тоже", "так же", "то же что и тогда", "без изменений", "не изменилось", "всё так же", "все так же"],
+        same: ["то же", "то же самое", "то же что и тогда", "всё по прежнему", "все по прежнему", "по прежнему", "осталось прежним", "без изменений", "не изменилось", "всё так же", "все так же"],
         possessive: ["мой", "моя", "моё", "мое", "мои", "наш", "наша", "наше", "наши"],
         months: { "январе": 0, "феврале": 1, "марте": 2, "апреле": 3, "мае": 4, "июне": 5, "июле": 6, "августе": 7, "сентябре": 8, "октябре": 9, "ноябре": 10, "декабре": 11 },
     },
@@ -182,7 +182,9 @@ export const FIRST_PERSON_OTHER = new Set(others("firstPerson"));
 export const NONE_OTHER = others("none");
 export const SAME_OTHER = others("same");
 export const selfWords = () => all("self").concat(all("relationship"));
-export const selfWithWords = (n) => all("selfWith").map((p) => p.replace("{n}", n));
+export const selfWithWords = (n) => [...new Set(all("selfWith").flatMap((p) => [p.replace("{n}", n), ...(p.includes(" с {n}") || p.includes(" со {n}") || p.includes(" з {n}") ? [p.replace("{n}", ruWith(n))] : [])]))];
+// The form a Russian name takes after "с" (with): Борис -> Борисом, Мика -> Микой, Илья -> Ильёй; names in и/у/ю/е/э/о stay.
+function ruWith(n) { if (!/^[\p{scx=Cyrillic} ]+$/u.test(n)) return n; const irr = RU_IRREGULAR[n]; if (irr) return irr + "ом"; if (/[иуюеэо]$/u.test(n)) return n; if (/[жшчщц]а$/u.test(n)) return n.slice(0, -1) + "ей"; if (/а$/u.test(n)) return n.slice(0, -1) + "ой"; if (/я$/u.test(n)) return n.slice(0, -1) + "ёй"; if (/[йь]$/u.test(n)) return n.slice(0, -1) + "ем"; if (/[жшчщц]$/u.test(n)) return n + "ем"; return n + "ом"; }
 // The words a dot name starts with that mean "my/our" (English: the/my/our, as before). Only whole words, only at the start.
 const POSS = others("possessive").sort((a, b) => b.length - a.length);
 const POSS_AFTER = others("possessiveAfter").sort((a, b) => b.length - a.length);
@@ -216,7 +218,7 @@ function joined(t, w) {
             return true;
     return false;
 }
-export const isNoneOther = (z) => NONE_OTHER.some((w) => z === w || z.startsWith(w + " "));
+export const isNoneOther = (z) => NONE_OTHER.includes(z);
 export const isSameOther = (z) => SAME_OTHER.some((w) => z === w);
 
 // Months in many languages (from the computer's own calendar data), with the case forms a date takes.
@@ -256,6 +258,15 @@ const RU_ADJ = ["ый", "ий", "ой", "ая", "яя", "ое", "ее", "ые", 
 const RU_ADJ_END = ["ый", "ий", "ой", "ая", "яя", "ое", "ее", "ые", "ие", "ій", "ого", "его", "ому", "ему", "ым", "им", "ую", "юю", "ыми", "ими", "ых", "их", "ім", "ою", "ею", "ої", "ій", "ою"];
 const RU_NOUN_END = ["а", "я", "о", "е", "и", "ы", "у", "ю", "і", "ї", "ь", "й", "ом", "ем", "ой", "ей", "ою", "ею", "ам", "ям", "ами", "ями", "ах", "ях", "ов", "ев", "ові", "еві", "ів", "ям", "ём", "ою", "ію", "єю"];
 const RU_SHORT_END = ["а", "я", "е", "и", "ы", "у", "ю", "і", "ей", "ой", "ою", "ею"];
+// Nesertes (Nov 14): a name's own case forms only (no plural, no bare stem): Света is never "свет", Маша never "машем", Борис never "Борисов".
+const RU_FEM_A = ["а", "ы", "и", "е", "у", "ой", "ою", "ей", "ею", "і"];
+const RU_FEM_YA = ["я", "и", "е", "ю", "ей", "ёй", "ею", "ёю", "і", "ї", "єю"];
+const RU_MASC = ["а", "у", "ом", "е", "ові", "і"];
+const RU_SOFT = ["я", "ю", "ем", "е", "и", "ью", "ею", "еві", "і"];
+// Names whose stem changes (a closed list, Nesertes's report 3.2): the stem the other forms are built on.
+const RU_IRREGULAR = { "лев": "льв", "павел": "павл", "пётр": "петр", "петр": "петр" };
+// е and ё are often written for each other (Алёна / Алена): for finding a name in a line only, never for merging two dots.
+const yo = (s) => esc(s).replace(/[её]/gu, "[её]");
 const KO_PARTICLES = ["은", "는", "이", "가", "을", "를", "의", "에", "에서", "에게", "한테", "께", "와", "과", "랑", "이랑", "하고", "도", "만", "부터", "까지", "로", "으로", "야", "아", "님", "씨", "들", "이가", "이는", "이를", "이랑", "이도", "이의", "이한테", "이에게"];
 const TR_APOS = ["da", "de", "ta", "te", "dan", "den", "tan", "ten", "a", "e", "ya", "ye", "ı", "i", "u", "ü", "yı", "yi", "yu", "yü", "ın", "in", "un", "ün", "nın", "nin", "nun", "nün", "la", "le", "yla", "yle", "na", "ne", "nda", "nde", "ndan", "nden"];
 // Latin-script endings, only when the line itself shows that language's letters (so English lines never change).
@@ -271,9 +282,19 @@ function wordPattern(w, last, text) {
         const cs = Array.from(w), n = cs.length;
         if (n >= 5 && RU_ADJ.includes(cs.slice(-2).join("")) && n - 2 >= 3)
             return esc(cs.slice(0, -2).join("")) + alt(RU_ADJ_END);
-        let stem = w, ends = RU_NOUN_END;
+        if (/[иуюеэ]$/u.test(w))
+            return yo(w);
+        const irr = RU_IRREGULAR[w];
+        if (irr)
+            return `(?:${yo(w)}|${yo(irr)}${alt(RU_MASC)})`;
+        if (/[ая]$/u.test(w) && n - 1 >= 2)
+            return yo(cs.slice(0, -1).join("")) + alt(w.endsWith("а") ? RU_FEM_A : RU_FEM_YA);
+        if (/[йь]$/u.test(w) && n - 1 >= 2)
+            return yo(cs.slice(0, -1).join("")) + alt([w.slice(-1), ...RU_SOFT]);
+        let stem = w, ends = RU_MASC;
         if (/[аяоеиыуєюіїьй]$/u.test(w) && n - 1 >= 2) {
             stem = cs.slice(0, -1).join("");
+            ends = RU_NOUN_END;
             if (n - 1 === 2)
                 ends = RU_SHORT_END;
         }
@@ -281,7 +302,7 @@ function wordPattern(w, last, text) {
         const m = /^(.*)([іїо])([^аяоеиыуєюіїьй])$/u.exec(stem);
         if (m && m[2] !== "о")
             return `(?:${esc(stem)}${alt(ends)}?|${esc(m[1])}[оеє]${esc(m[3])}${alt(ends)})`;
-        return esc(stem) + alt(ends) + "?";
+        return yo(stem) + alt(ends) + "?";
     }
     if (last && HANGUL.test(w))
         return esc(w) + alt(KO_PARTICLES) + "?";
@@ -328,7 +349,7 @@ export function namePattern(x, text) {
     return p;
 }
 // The first two letters of a name never change in any of its forms: a quick look before the full check.
-export const probeOf = (x) => Array.from(x).slice(0, 2).join("");
+export const probeOf = (x) => Array.from(x).slice(0, /^\p{scx=Cyrillic}/u.test(x) ? 1 : 2).join("");
 // Find a name's pattern in text with word edges at both ends, in any script. Spaced scripts: the edges are in the pattern itself
 // (so a longer or shorter ending is tried until one fits, as the old check did). Between two letters of a no-space script: the word splitter decides.
 const NS_ = `[${NS_CLASS}]`;

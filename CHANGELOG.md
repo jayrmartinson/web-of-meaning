@@ -1,6 +1,47 @@
 # Changelog
 
-## Unreleased
+## 1.2 (November 18, 2026)
+
+### Russian: Nesertes's native-speaker review
+
+Nesertes's review of the Russian word lists and name rules (November 14, 2026), with his test sentences in `code/tests/web-russian-tests.mjs`. Finding a name in a line still never merges two dots. English behaves exactly as before.
+
+- **A name's own case forms only:** a name in -а/-я must carry one of its own endings, so Света is never found in «свет», Ника in «ник», Поля in «пол» or Маша in «машем». Names that end in a consonant take only singular endings, so Борис is never found in «Борисов».
+- **Names that never change** (ending in и, у, ю, е or э, like Юки and Бенни) are found only as written, so Юки is never found in «Юка».
+- **Names whose stem changes:** Лев and Льва, Павел and Павла, Пётр and Петра (a short, fixed list). This fixes the known limit in 1.1.
+- **ё and е** are read as each other when finding a name (Алёна and Алена, Ильёй and Ильей), never when deciding two dots are one.
+- **"No feeling"** is only a whole answer («нет», «ничего», «без чувств»); «нет радости» and «Нет, я всё ещё расстроен» keep their feeling.
+- **"Unchanged":** «тоже» (too) and «так же» (in the same way) no longer count; «всё по-прежнему» and «осталось прежним» do.
+- **Other, new and character words:** the missing case forms of другой, иной, второй, чужой, новый, персонаж, аватар, бот and шаблон. «другом» (with a friend) and «другими словами» (in other words) are left out on purpose.
+- **"Me and…":** «мы с Борисом», «мы с Микой», «мы со Львом».
+- Known limit: «Я хочу мира» still finds a Мира, because «мира» ("of peace") is the same word letter for letter.
+
+### Dates
+
+- **Two-digit years:** 7.2.26 and 07.02.26 are February 7, 2026 (day first, as in Russian); 31.2.26 is not a date.
+
+### Moment and stretch
+
+- **moment:** a single turning point, milestone or standout event, including one inside a single pivotal conversation or one continuous event crossing midnight; never routine small talk.
+- **stretch:** a period of more than one day with a unifying tone or ongoing effort of its own; unrelated routine days don't become a dot.
+- **Tie-breaker:** an experience over several days is a stretch; a moment dot beside it only when the source gives that sub-event its own name.
+- Dots already in a web keep their kinds; the new wording guides each night from now on.
+
+### Ranking by active days & recall visits
+
+For ranking only. The active-day cooling idea comes from Mnemos (Riley Coyote). Nothing is forgotten, and "then", "now", the links and the log never change; the same made-up night gives the same web as 1.1.
+
+- **Opening a link counts:** a link the companion opens by its mark counts as touched that day.
+- **Active days:** a link's weight halves over 365 active days since it was last touched, not 365 calendar days. Active days come from the Shelf's file names (listed, never read while the companion looks), the days the night found conversation on (kept, sealed, in `Mind/web-active-days.sealed`), the web's own dates and the companion's visits. Days the computer was off don't age a memory. Dates inside pasted older text don't count (as in 287).
+
+### Paper & Documentation
+
+- Items from November 13: the Anchor section simplified to what runs today (hand-edited page with size checks on read); "thinking fully" dropped from dreams; "(Her own request.)" dropped; the 3D picture, "a web from day one" and the rest of the future plans dropped (so "Still to come" is gone).
+- The dates: the design began in conversation, September 2 and 17 to 20, 2026; the House was set up October 2 to 13; the web was built from October 14. New Timeline rows.
+- A Contributors section (Nesertes), and Related work, with Mnemos cited and contrasted.
+- How a link is ranked, under For builders.
+
+## 1.1 (November 12, 2026)
 
 ### The paper (README.md) and its diagram
 

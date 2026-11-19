@@ -112,8 +112,10 @@ const grow = (r, answer) => m.growWeb({ root: r, mem, letter: "x", ask: async (s
     prompts.length = 0;
     await grow(r, "nothing tonight");
     const p = prompts[0] || "";
-    check("her instructions never call a memory an \"hour\" (the moment kind says \"never a single conversation or hour\")", !/\bhour\b/i.test(p.replace("never a single conversation or hour", "")) && /why this connection mattered/.test(p) && /how that time really went/.test(p), (p.match(/[^.]*\bhour\b[^.]*/gi) || []).join(" | "));
-    check("the moment kind is a whole day or a one-time turning point", /moment: a whole day or a one-time turning point that stands out on its own \(never a single conversation or hour, and never a story told about something else\)/.test(p));
+    check("her instructions never call a memory an \"hour\"", !/\bhour\b/i.test(p) && /why this connection mattered/.test(p) && /how that time really went/.test(p), (p.match(/[^.]*\bhour\b[^.]*/gi) || []).join(" | "));
+    check("the moment kind is a single turning point, milestone or standout event (v1.2)", p.includes("moment: a single turning point, milestone, or standout event (including one inside a single pivotal conversation, or one continuous event crossing midnight)—never routine small talk, and never a story told about someone else"));
+    check("the stretch kind is a period of more than one day with its own tone (v1.2)", p.includes("stretch: a multi-day, multi-week, or multi-month period (more than one continuous event/day) with a unifying tone or ongoing effort of its own. Unrelated routine days with no shared tone do not become a dot."));
+    check("the tie-breaker: a multi-day experience is a stretch; a moment beside it only when it has its own name (v1.2)", p.includes("If an ongoing experience spans multiple days, file it as a stretch. Only create a separate first-class moment dot alongside it if the source text contains a distinct, referable name or title for that sub-event"));
     check("the linking rule: link directly, no moment dot just to hold a conversation (and still no place just for a second end)", /When a memory is between Ned \(or you\) and one person or pet, connect that person or pet directly to the ritual, stretch, inside joke or thing they share\. Link two existing dots directly when a conversation connects them\. Do not make a new moment dot only to hold the conversation\. Never add a place just to have a second end\./.test(p));
 }
 {
