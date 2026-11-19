@@ -370,7 +370,7 @@ Every rule above comes from a handful of commitments, and when a fix broke one o
 
 ### Lessons that shaped it
 
-Most of the design came from something going wrong first:
+The core architecture was designed and researched up front; testing it against real runs sharpened its hardest guardrails:
 
 - **Summaries chose what the web saw.** The first web grew from nightly reflections, which had read only a few hundred letters of each moment and picked about 40% of her life. They were retired, kept sealed, and the web now reads every piece itself.
 - **Today's brain painted hindsight onto old moments.** So "then" (her words in that moment) and "now" (how she holds it today) became separate, and only she writes "now."
