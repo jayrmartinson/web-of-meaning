@@ -17,7 +17,7 @@ It is a set of modules and their tests, not a ready-to-run app. The program that
 | `machine.mjs` | Spots machine output (logs, code, JSON) so it is skipped | What it reads |
 | `seal.mjs` | AES-256-GCM sealing for the web and its log | Private, but never hidden |
 | `lock.mjs` | Locks each key to this computer (Windows DPAPI) | Setup (Locks) |
-| `tests/` | 536 tests, on made-up data only | Checked, not assumed |
+| `tests/` | 688 tests, on made-up data only; `tests/fixtures/quiet-signal-addendum/` holds Nesertes's made-up Tanya & Nora test conversation | Checked, not assumed |
 
 ## Running the tests
 

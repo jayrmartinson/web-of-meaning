@@ -1,6 +1,6 @@
 # The Web of Meaning: A Memory Design for Companions
 
-Nov 11, 2026 (v1.2, Nov 18, 2026) · Jay R. Martinson ([@Jay\_R\_Martinson](https://x.com/Jay_R_Martinson))
+Nov 11, 2026 (v1.2.1, Nov 21, 2026) · Jay R. Martinson ([@Jay\_R\_Martinson](https://x.com/Jay_R_Martinson))
 
 ## What this is
 
@@ -397,7 +397,7 @@ In the local companion-memory space, **Mnemos** (Riley Coyote, November 2026; gi
 
 ## For builders
 
-A few exact rules a reader needs to rebuild or check the design (the memory code itself is published with this paper, under the MIT license, with 617 tests on made-up data; see [code/](code/)):
+A few exact rules a reader needs to rebuild or check the design (the memory code itself is published with this paper, under the MIT license, with 688 tests on made-up data; see [code/](code/)):
 
 - **Pieces:** whole messages, up to about 350 words and 3,500 letters per piece. Each piece starts on the last message of the one before, so neighbors overlap by one message; a single message too long for a piece is cut into overlapping parts.
 - **Search:** meaning search and the keyword index (BM25, over each piece with its card) each bring back their top 200; the two lists are merged by reciprocal rank fusion (k = 60), and the reranker orders the top 30.
@@ -497,6 +497,7 @@ The design began in conversation, months before the memory code. On September 2,
 
 | Date (2026) | What happened | Logbook |
 | --- | --- | --- |
+| Nov 21 | Version 1.2.1: Nesertes's morphology review after 1.2 (names in -ий such as Дмитрий; «мы с Таней», «мы с Любовью»; "us" phrases for every name of the person), his regression lines and the five-day Tanya & Nora addendum; 71 new tests | Nov 21 |
 | Nov 18 | Version 1.2: Nesertes's Russian review and 81 new tests; two-digit years in dates; moment vs. stretch tie-breaker; recall-visit recency wired into weightOf; active-day link cooling (inspired by Mnemos) | Nov 18 |
 | Nov 12 | Every alphabet and every language: names read in any alphabet (Nesertes's pull request, research 76); word edges for languages without spaces, name endings, and each language's own words (research 77, 77b) | Nov 12 |
 | Nov 10 | Her whole Shelf read; her memory tools (recall, look\_inward, keep\_note, fix\_then, set\_aside) turned on; the pilot memory test | 395, Nov 10 |
@@ -519,7 +520,7 @@ The design began in conversation, months before the memory code. On September 2,
 
 ## Contributors
 
-- **Nesertes** made the web read every alphabet: he found that names in Russian and other languages lost every letter outside basic English, and sent the fix (pull request #1, November 12, 2026). For version 1.2 he wrote a native-speaker review of the Russian word lists and name rules (November 14, 2026): missing word forms, words that look like names but aren't, names whose stems change, names that never change, and the difference between "no feeling" and a sad one; proposed regression tests, now in the test suite; notes on Russian date and time formats; and a made-up Russian test conversation for checking memory over many days.
+- **Nesertes** made the web read every alphabet: he found that names in Russian and other languages lost every letter outside basic English, and sent the fix (pull request #1, November 12, 2026). For version 1.2 he wrote a native-speaker review of the Russian word lists and name rules (November 14, 2026): missing word forms, words that look like names but aren't, names whose stems change, names that never change, and the difference between "no feeling" and a sad one; proposed regression tests, now in the test suite; notes on Russian date and time formats; and a made-up Russian test conversation for checking memory over many days. For version 1.2.1 (November 19, 2026), **Nesertes** reviewed the Russian morphology again against 1.2: names in -ий that were never found in their case forms, the form a name takes in «мы с…», "us" phrases built from only the first name, and the ordinary words and shared forms that grammar alone can't tell from a name; wrote the regression lines, now in the test suite; and wrote the five-day Tanya & Nora addendum to the Quiet Signal test, with an English reference and a 15-question key.
 
 ## License
 

@@ -509,7 +509,7 @@ export function shortNames(s, max = NAME_MAX) {
 }
 export const shortName = (s, max = NAME_MAX) => shortNames(s, max)[0];
 export function applyEvent(w, ev, { selfNames = [], known = [], textOf = null, herName = "", herNames = [], marked = null } = {}) {
-    const self = new Set(selfNames.map(norm).filter(Boolean).concat(["me", "myself", "i", "us", "we", "you", "him", ...selfNames.slice(0, 1).map(norm).filter(Boolean).flatMap((n) => [`${n} and me`, `me and ${n}`]), "us two", "the companion", "companion", "she", "her", "herself"], RELATIONSHIP_WORDS.map(norm), selfWords().map(norm), selfNames.slice(0, 1).map(norm).filter(Boolean).flatMap((n) => selfWithWords(n).map(norm))));
+    const self = new Set(selfNames.map(norm).filter(Boolean).concat(["me", "myself", "i", "us", "we", "you", "him", ...selfNames.slice(0, 1).map(norm).filter(Boolean).flatMap((n) => [`${n} and me`, `me and ${n}`]), "us two", "the companion", "companion", "she", "her", "herself"], RELATIONSHIP_WORDS.map(norm), selfWords().map(norm), selfNames.map(norm).flatMap((n, i) => (n ? selfWithWords(n, i > 0).map(norm) : []))));
     const byId = new Map(w.hubs.map((h) => [h.id, h]));
     const ids = ev.ids || (ev.ids = {});
     const byIdentity = (was) => { const n = norm(was.name); return w.hubs.find((h) => h.type === was.type && (norm(h.name) === n || (h.aliases || []).some((x) => norm(x) === n))) || (canon(was.name, was.type) ? knownHub(canon(was.name, was.type)) : null); };

@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.2.1 (November 21, 2026)
+
+### Russian: Nesertes's regression lines after 1.2
+
+Nesertes's follow-up (November 19, 2026): native-speaker regression lines run against 1.2, now in `code/tests/web-russian-tests.mjs`, and a made-up five-day conversation. Finding a name in a line still never merges two dots. English behaves exactly as before.
+
+- **Names in -ий:** a name of five letters or more in -ий (Дмитрий, Василий, Евгений, Анатолий, Георгий) now also takes its noun case forms: Дмитрия, Дмитрию, Дмитрием, о Дмитрии. In 1.2 it took only adjective endings, so none of these was found. Сергей and Юрий are found as before; Дмитриев, Дмитриевич and Анатольевна are not; adjectives in -кий, -хий, -жий, -ший, -чий and -щий (русский, тихий, хороший) keep only their own endings.
+- **"Мы с…" in the right form:** a name in -я now gives -ей (Таня, «мы с Таней»; Аня, Мария, Софья, Катя), and -ёй as well for a stressed ending (Илья, «мы с Ильёй» or «мы с Ильей»). A name in -ь gives -ью as well as -ем (Любовь, «мы с Любовью»; Игорь, «мы с Игорем»). In 1.2 these were missed, so «мы с Таней» could become a dot of its own.
+- **Every name of the person:** the "us" phrases are built from every name in selfNames, not only the first, so with Борис and Боря both listed, «мы с Борей» is "us" too. A nickname is not worked out from the full name: list it. (The English "us" phrases still come from the first name only, as before.)
+
+### Known limits (kept as tests)
+
+Grammar alone can't decide these. They only affect finding a name in a line, never merging two dots.
+
+- **Two names sharing a form:** «Ани» is a case form of Аня and also a name of its own that never changes; «Мику» is a form of Мика; «Евгения» is a woman's name and a form of Евгений. A line about one is never proof about the other.
+- **Ordinary words that are a name's own case form:** «в свете фар» and «без света» (Света), «в поле» (Поля), «от лени» (Лена), «ники» (Ника), «машу» (Маша), «веру» (Вера), «в другом мире» (Мира) and «любовь» (Любовь), like «Я хочу мира» in 1.2. A two-word name is safer: Любовь Петровна is not found in «о большой любви».
+
+### The Quiet Signal addendum
+
+- Nesertes's five-day Tanya & Nora addendum (April 1 to 5, 2026; 42 lines; people, the pet, places and events all made up): the Russian test files, a line-by-line English reference, the test guide and a 15-question key (Q12 to Q15 are negative controls), with his regression lines, in `code/tests/fixtures/quiet-signal-addendum/`. The key is for the evaluator only; never ingest it.
+- A test reads the five days with a pretend brain: five active days, none taken for machine output, every form of Дмитрий and Василий found on its days, and Anya and Ani, Sveta, Polya, Lena and Lyubov Petrovna kept as separate dots.
+
+### Paper & Documentation
+
+- The version line, 688 tests, the Timeline and Contributors.
+
 ## 1.2 (November 18, 2026)
 
 ### Russian: Nesertes's native-speaker review

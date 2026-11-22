@@ -182,9 +182,13 @@ export const FIRST_PERSON_OTHER = new Set(others("firstPerson"));
 export const NONE_OTHER = others("none");
 export const SAME_OTHER = others("same");
 export const selfWords = () => all("self").concat(all("relationship"));
-export const selfWithWords = (n) => [...new Set(all("selfWith").flatMap((p) => [p.replace("{n}", n), ...(p.includes(" с {n}") || p.includes(" со {n}") || p.includes(" з {n}") ? [p.replace("{n}", ruWith(n))] : [])]))];
-// The form a Russian name takes after "с" (with): Борис -> Борисом, Мика -> Микой, Илья -> Ильёй; names in и/у/ю/е/э/о stay.
-function ruWith(n) { if (!/^[\p{scx=Cyrillic} ]+$/u.test(n)) return n; const irr = RU_IRREGULAR[n]; if (irr) return irr + "ом"; if (/[иуюеэо]$/u.test(n)) return n; if (/[жшчщц]а$/u.test(n)) return n.slice(0, -1) + "ей"; if (/а$/u.test(n)) return n.slice(0, -1) + "ой"; if (/я$/u.test(n)) return n.slice(0, -1) + "ёй"; if (/[йь]$/u.test(n)) return n.slice(0, -1) + "ем"; if (/[жшчщц]$/u.test(n)) return n + "ем"; return n + "ом"; }
+// othersOnly (v1.2.1): every name in selfNames gets the "us" phrases; the English ones stay built from the first name only, as before.
+export const selfWithWords = (n, othersOnly = false) => [...new Set((othersOnly ? others : all)("selfWith").flatMap((p) => [p.replace("{n}", n), ...(p.includes(" с {n}") || p.includes(" со {n}") || p.includes(" з {n}") ? ruWith(n).map((f) => p.replace("{n}", f)) : [])]))];
+// The forms a Russian name takes after "с" (with): Борис -> Борисом, Мика -> Микой, Маша -> Машей; names in и/у/ю/е/э/о stay.
+// v1.2.1 (Nesertes, Nov 19): a name in -я takes -ей when the ending is unstressed (Таня -> Таней, Мария -> Марией, Софья -> Софьей)
+// and -ёй when it is stressed (Илья -> Ильёй, often written Ильей); stress isn't written, so both are kept. A name in -ь can be
+// feminine (Любовь -> Любовью) or masculine (Игорь -> Игорем), so both are kept too. A form no one writes never matches anything.
+function ruWith(n) { if (!/^[\p{scx=Cyrillic} ]+$/u.test(n)) return [n]; const irr = RU_IRREGULAR[n]; if (irr) return [irr + "ом"]; if (/[иуюеэо]$/u.test(n)) return [n]; if (/[жшчщц]а$/u.test(n)) return [n.slice(0, -1) + "ей"]; if (/а$/u.test(n)) return [n.slice(0, -1) + "ой"]; if (/я$/u.test(n)) return [n.slice(0, -1) + "ей", n.slice(0, -1) + "ёй"]; if (/ь$/u.test(n)) return [n.slice(0, -1) + "ем", n + "ю"]; if (/й$/u.test(n)) return [n.slice(0, -1) + "ем"]; if (/[жшчщц]$/u.test(n)) return [n + "ем"]; return [n + "ом"]; }
 // The words a dot name starts with that mean "my/our" (English: the/my/our, as before). Only whole words, only at the start.
 const POSS = others("possessive").sort((a, b) => b.length - a.length);
 const POSS_AFTER = others("possessiveAfter").sort((a, b) => b.length - a.length);
@@ -258,6 +262,10 @@ const RU_ADJ = ["ый", "ий", "ой", "ая", "яя", "ое", "ее", "ые", 
 const RU_ADJ_END = ["ый", "ий", "ой", "ая", "яя", "ое", "ее", "ые", "ие", "ій", "ого", "его", "ому", "ему", "ым", "им", "ую", "юю", "ыми", "ими", "ых", "их", "ім", "ою", "ею", "ої", "ій", "ою"];
 const RU_NOUN_END = ["а", "я", "о", "е", "и", "ы", "у", "ю", "і", "ї", "ь", "й", "ом", "ем", "ой", "ей", "ою", "ею", "ам", "ям", "ами", "ями", "ах", "ях", "ов", "ев", "ові", "еві", "ів", "ям", "ём", "ою", "ію", "єю"];
 const RU_SHORT_END = ["а", "я", "е", "и", "ы", "у", "ю", "і", "ей", "ой", "ою", "ею"];
+// v1.2.1 (Nesertes, Nov 19): a name in -ий of 5+ letters (Дмитрий, Василий, Евгений, Анатолий) also takes its noun case forms
+// (Дмитрия, Дмитрию, Дмитрием, о Дмитрии), next to the adjective endings. Not after к/х/ж/ш/ч/щ (русский, тихий, рыжий, хороший,
+// горячий, будущий): no Russian name ends that way, so those adjectives keep only their own endings.
+const RU_II_NOUN = ["я", "ю", "ем", "и", "е"];
 // Nesertes (Nov 14): a name's own case forms only (no plural, no bare stem): Света is never "свет", Маша never "машем", Борис never "Борисов".
 const RU_FEM_A = ["а", "ы", "и", "е", "у", "ой", "ою", "ей", "ею", "і"];
 const RU_FEM_YA = ["я", "и", "е", "ю", "ей", "ёй", "ею", "ёю", "і", "ї", "єю"];
@@ -280,8 +288,12 @@ const LATIN_ENDS = [
 function wordPattern(w, last, text) {
     if (CYR.test(w) && Array.from(w).length >= 3) {
         const cs = Array.from(w), n = cs.length;
-        if (n >= 5 && RU_ADJ.includes(cs.slice(-2).join("")) && n - 2 >= 3)
-            return esc(cs.slice(0, -2).join("")) + alt(RU_ADJ_END);
+        if (n >= 5 && RU_ADJ.includes(cs.slice(-2).join("")) && n - 2 >= 3) {
+            const adj = esc(cs.slice(0, -2).join("")) + alt(RU_ADJ_END);
+            if (w.endsWith("ий") && !/[кхжшчщ]/u.test(cs[n - 3]))
+                return `(?:${adj}|${esc(cs.slice(0, -1).join(""))}${alt(RU_II_NOUN)})`;
+            return adj;
+        }
         if (/[иуюеэ]$/u.test(w))
             return yo(w);
         const irr = RU_IRREGULAR[w];
