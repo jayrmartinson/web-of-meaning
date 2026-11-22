@@ -2,10 +2,10 @@
 // Comments were removed for this release; the paper explains each part and why it was built that way.
 import { cardLabel } from "./cards.mjs";
 import { wordsIn, hasNoSpaceScript, STOP_ALL } from "./lang.mjs";
+import { chunkTranscriptHeader, isChunkHeader, transcriptMillis } from "./transcript.mjs";
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, lstatSync, renameSync } from "node:fs";
 import { join, dirname } from "node:path";
-const HEADER = /^\\?​?\[([A-Z][A-Z0-9 _-]*)\]\s*\((.+?)\):\s*$/;
 const CHUNK_WORDS = 350;
 const BATCH = 8;
 let server = null, ready = null;
@@ -258,11 +258,11 @@ function chunkFile(raw, pieceChars = 0) {
             pos += l.length + 1;
         }
     }
-    const isThread = lines.some((l) => HEADER.test(l.trim()));
+    const isThread = lines.some(isChunkHeader);
     const units = [];
     let cur = null;
     for (let i = 0; i < lines.length; i++) {
-        const newUnit = isThread ? HEADER.test(lines[i].trim()) : (lines[i].trim() === "" && cur && cur.words > 0);
+        const newUnit = isThread ? isChunkHeader(lines[i]) : (lines[i].trim() === "" && cur && cur.words > 0);
         if (!cur || newUnit) {
             if (cur && cur.words)
                 units.push(cur);
@@ -446,8 +446,8 @@ export function skippedPiece(mem, text, ch) {
         return false;
     const line = (at) => text.slice(at, text.indexOf("\n", at) < 0 ? undefined : text.indexOf("\n", at));
     const head = ch.h !== undefined ? line(ch.h).trim() : "";
-    const m = HEADER.exec((head || line(ch.a)).trim());
-    return !!(m && mem.skip.includes(m[2].trim()));
+    const header = chunkTranscriptHeader(head || line(ch.a));
+    return !!(header && mem.skip.includes(header.timestamp.trim()));
 }
 export async function searchMemory(cfg, root, mem, query, max = 6, opts = {}) {
     if (Number(mem.results) > 0 && !opts.items)
@@ -510,8 +510,8 @@ export async function searchMemory(cfg, root, mem, query, max = 6, opts = {}) {
         if (skippedPiece(mem, text, ch))
             continue;
         if (!isNaN(from)) {
-            const m = HEADER.exec(head || text.slice(ch.a, text.indexOf("\n", ch.a)).trim());
-            const t = m ? Date.parse(m[2]) : NaN;
+            const header = chunkTranscriptHeader(head || text.slice(ch.a, text.indexOf("\n", ch.a)));
+            const t = transcriptMillis(header);
             if (!isNaN(t) && t >= from)
                 continue;
         }
@@ -521,7 +521,9 @@ export async function searchMemory(cfg, root, mem, query, max = 6, opts = {}) {
         const card = cards[h.rel]?.[cardKey(ch)];
         let jnote = "";
         if (opts.journalDays?.size) {
-            const lines = [head, ...piece.split("\n", 40)].filter(Boolean), hm = lines.map((l) => HEADER.exec(l.replace(/\u200B/g, "").trim())).find(Boolean), tt = hm ? Date.parse(hm[2]) : NaN;
+            const lines = [head, ...piece.split("\n", 40)].filter(Boolean);
+            const header = lines.map((l) => chunkTranscriptHeader(l.replace(/\u200B/g, ""))).find(Boolean);
+            const tt = transcriptMillis(header);
             if (!isNaN(tt)) {
                 const d = new Date(tt), day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
                 if (opts.journalDays.has(day))
