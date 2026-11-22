@@ -1,10 +1,10 @@
 // Part of The Web of Meaning: A Memory Design for Companions (Jay R. Martinson, 2026). MIT license; see LICENSE.
 // Comments were removed for this release; the paper explains each part and why it was built that way.
-const HEADER = /^\s*\\?\u200B?\[[A-Za-z][A-Za-z0-9 _-]*\]\s*(\([^)]*\))?\s*:?\s*$/;
+import { isMachineHeader } from "./transcript.mjs";
 const MACHINE_LINE = /^\s*(PS [A-Za-z]:\\|[A-Za-z]:\\|[$#>] |\$ |at [\w.<]+[ (]|[{}\[\]],?$|"[^"]{1,60}"\s*:|[\w.-]+\s*[:=]\s*\S+$|\d{1,2}:\d{2}:\d{2}|\d{4}-\d{2}-\d{2}[T ]\d|(ERROR|WARN|WARNING|INFO|DEBUG|TRACE)\b|(npm|kit|node|git|winget|wsl|curl|python|cd|ls|dir)\s|\||#{1,6} |```|<\/?[a-z]+[ >]|\/\/|import |export |const |function |def |class )/i;
 const NS_LETTERS = /[\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}\p{scx=Thai}\p{scx=Lao}\p{scx=Khmer}\p{scx=Myanmar}]/gu;
 export function machineLike(text) {
-    const lines = String(text || "").split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !HEADER.test(l));
+    const lines = String(text || "").split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !isMachineHeader(l));
     if (!lines.length)
         return false;
     const body = lines.join("\n"), letters = (body.match(/[\p{L}\p{M}]/gu) || []).length;

@@ -289,9 +289,9 @@ function wordPattern(w, last, text) {
     if (CYR.test(w) && Array.from(w).length >= 3) {
         const cs = Array.from(w), n = cs.length;
         if (n >= 5 && RU_ADJ.includes(cs.slice(-2).join("")) && n - 2 >= 3) {
-            const adj = esc(cs.slice(0, -2).join("")) + alt(RU_ADJ_END);
+            const adj = yo(cs.slice(0, -2).join("")) + alt(RU_ADJ_END);
             if (w.endsWith("ий") && !/[кхжшчщ]/u.test(cs[n - 3]))
-                return `(?:${adj}|${esc(cs.slice(0, -1).join(""))}${alt(RU_II_NOUN)})`;
+                return `(?:${adj}|${yo(cs.slice(0, -1).join(""))}${alt(RU_II_NOUN)})`;
             return adj;
         }
         if (/[иуюеэ]$/u.test(w))
@@ -367,8 +367,9 @@ export const probeOf = (x) => Array.from(x).slice(0, /^\p{scx=Cyrillic}/u.test(x
 const NS_ = `[${NS_CLASS}]`;
 const END = `(?=$|[^\\p{L}\\p{M}\\p{N}]|${NS_}|(?<=${NS_}))`;
 const compiled = new Map();
-export function foundAt(text, pattern, probe = "") {
-    if (probe && !text.includes(probe))
+export function foundAt(text, pattern, probe = "", accepts = null) {
+    const hasProbe = probe === "е" || probe === "ё" ? /[её]/u.test(text) : text.includes(probe);
+    if (!hasProbe)
         return false;
     let re = compiled.get(pattern);
     if (!re) {
@@ -388,10 +389,10 @@ export function foundAt(text, pattern, probe = "") {
             re.lastIndex = s + 1;
             continue;
         }
-        if (!hasNoSpaceScript(m[0]) && !hasNoSpaceScript(b) && !hasNoSpaceScript(at(text, e)))
-            return true;
-        edges ||= wordEdges(text);
-        if (edgeAt(text, s, edges) && edgeAt(text, e, edges))
+        const spaced = !hasNoSpaceScript(m[0]) && !hasNoSpaceScript(b) && !hasNoSpaceScript(at(text, e));
+        if (!spaced)
+            edges ||= wordEdges(text);
+        if ((spaced || (edgeAt(text, s, edges) && edgeAt(text, e, edges))) && (!accepts || accepts(m[0], s, e)))
             return true;
         re.lastIndex = s + 1;
     }

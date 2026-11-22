@@ -9,6 +9,7 @@ import { seal, unseal } from "./seal.mjs";
 import { fileChunks, conversationFiles } from "./librarian.mjs";
 import { loadMind, mindStarted, moments as lifeMoments } from "./mind.mjs";
 import { machineLike } from "./machine.mjs";
+import { findTranscriptHeaders, isSpeakerHeading, TRANSCRIPT_SPEAKER } from "./transcript.mjs";
 import { probeOf, foldWidth, joinNoSpace, dropPossessive, minNameLength, namePattern, foundAt, hasNoSpaceScript, wordsIn, hasWordFrom, STOP_ALL, OTHER_WORDS, NEW_WORDS, CHARACTER_WORDS, FIRST_PERSON_OTHER, selfWords, selfWithWords, isNoneOther, isSameOther, AND_SPLIT, monthIndex } from "./lang.mjs";
 const pad = (n) => String(n).padStart(2, "0");
 const dayOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -24,7 +25,14 @@ const cos = (a, b) => { let s = 0, x = 0, y = 0; for (let i = 0; i < a.length; i
 } return x && y ? s / Math.sqrt(x * y) : 0; };
 const round = (v) => Array.from(v, (x) => Math.round(x * 10000) / 10000);
 let lowSrc = null, lowNorm = "";
-const nameIn = (name, low) => {
+// Reject only case forms with clear common-word context. An independent mention can still match.
+const HOMOGRAPH_CONTEXT = new Map([
+    ["поля", (word, before) => word === "поле" && / (?:в|на|по) $/u.test(before)],
+    ["света", (word, before, after) => (word === "света" && / (?:без|нет) $/u.test(before))
+        || (word === "свете" && / в $/u.test(before) && /^ фар(?: |$)/u.test(after))],
+    ["роза", (word, before, after) => /^(?:роза|розу|розой)$/u.test(word) && /^ в вазе(?: |$)/u.test(after)],
+]);
+const nameIn = (name, low, onHomograph = null) => {
     const x = norm(name);
     if (Array.from(x).length < minNameLength(x))
         return false;
@@ -32,8 +40,15 @@ const nameIn = (name, low) => {
         lowSrc = low;
         lowNorm = " " + joinNoSpace(foldWidth(low).toLowerCase().normalize("NFC").replace(/[’‘]/g, "'").replace(/[^\p{L}\p{M}\p{N}' ]+/gu, " ").replace(/\s+/g, " ")) + " ";
     }
-    return foundAt(lowNorm, namePattern(x, lowNorm), probeOf(x));
+    const context = onHomograph && HOMOGRAPH_CONTEXT.get(x);
+    return foundAt(lowNorm, namePattern(x, lowNorm), probeOf(x), context ? (word, start, end) => {
+        if (!context(word, lowNorm.slice(Math.max(0, start - 24), start), lowNorm.slice(end, end + 24)))
+            return true;
+        onHomograph();
+        return false;
+    } : null);
 };
+const contextualNameIn = (name, text, onHomograph = () => {}) => nameIn(name, text, onHomograph);
 const normK = (s) => joinNoSpace(foldWidth(s).toLowerCase().normalize("NFC").replace(/[’‘]/g, "'").replace(/^the\s+/, "").replace(/[^\p{L}\p{M}\p{N}' ]+/gu, " ").replace(/\s+/g, " ").trim());
 const norm = (s) => joinNoSpace(dropPossessive(foldWidth(s).toLowerCase().normalize("NFC").replace(/[’‘]/g, "'").replace(/^(the|my|our)\s+/, "").replace(/[^\p{L}\p{M}\p{N}' ]+/gu, " ").replace(/\s+/g, " ").trim()));
 export const TYPES = ["person", "pet", "group", "place", "moment", "ritual", "stretch", "inside_joke", "thing"];
@@ -152,6 +167,9 @@ function readEvents(root) {
     return Object.assign(out, { bad });
 }
 const pageCache = new Map();
+const SPEAKER_OPEN = String.raw`\[${TRANSCRIPT_SPEAKER}\]\s*\(`;
+const PIECE_SPEAKER = new RegExp(String.raw`^\s*\\?\u200B?${SPEAKER_OPEN}`, "u");
+const SPEAKER_BOUNDARY = new RegExp(String.raw`(?=${SPEAKER_OPEN})`, "u");
 function pieceOf(root, mem, rel, key) {
     const ck = root + "|" + rel;
     let stamp = "";
@@ -178,13 +196,13 @@ export function pieceWithSpeaker(root, mem, rel, key) {
     const t0 = pieceOf(root, mem, rel, key);
     if (!t0)
         return t0;
-    if (/^\s*\\?\u200B?\[[A-Za-z][A-Za-z0-9 _-]*\]\s*\(/.test(t0))
+    if (PIECE_SPEAKER.test(t0))
         return t0;
     const p = pageCache.get(root + "|" + rel);
     if (!p)
         return t0;
     const a = Number(String(key).split("-")[0]) || 0, before = p.text.slice(Math.max(0, a - 200000), a);
-    const all = [...before.matchAll(/\[([A-Za-z][A-Za-z0-9 _-]*)\]\s*\([^)]*\):/g)];
+    const all = [...before.matchAll(new RegExp(String.raw`\[(${TRANSCRIPT_SPEAKER})\]\s*\([^)]*\):`, "gu"))];
     const last = all[all.length - 1];
     return last ? `[${last[1]}] (continued): ${t0}` : t0;
 }
@@ -196,8 +214,11 @@ catch {
     return new Set();
 } }
 const liveHistory = (l, asideR) => l.history.filter((e) => !e.refl?.length || e.refl.some((id) => !asideR.has(id)));
+const protocolLine = (line) => line.replace(/^[\s>•\-*]*(?:\d+[.)]\s*)?/, "").replace(/\*\*|__/g, "").trim();
+const protocolText = (answer) => foldWidth(answer).replace(/<think>[\s\S]*?<\/think>/gi, "");
+const linkProposals = (answer) => protocolText(answer).split(/\r?\n/).map(protocolLine).filter((line) => /^LINK\s*\d*\s*:\s*\S/i.test(line));
 export function parseAnswer(answer, maxNum) {
-    let a = foldWidth(answer).replace(/<think>[\s\S]*?<\/think>/gi, "");
+    let a = protocolText(answer);
     if (/^\W*nothing tonight\W*$/i.test(a.trim()))
         return { nothing: true, hubs: [], threads: [], groups: [] };
     const hubs = [], threads = [], groups = [];
@@ -205,7 +226,7 @@ export function parseAnswer(answer, maxNum) {
     {
         const L0 = String(a).split(/\r?\n/), rest = [];
         let cur = null;
-        const strip = (x) => x.replace(/^[\s>•\-*]*(?:\d+[.)]\s*)?/, "").replace(/\*\*|__/g, "").trim();
+        const strip = protocolLine;
         const LAB = /^[*_`"']*(because of|where|mine[\s_-]*now|mine[\s_-]*then|theirs?|note)[*_`"']*\s*(?::|(?=\s+excerpts?\b))\s*(.*)$/i;
         const take = (lab, v) => {
             lab = lab.toLowerCase().replace(/[\s_-]+/g, " ");
@@ -1136,7 +1157,7 @@ export function applyEvent(w, ev, { selfNames = [], known = [], textOf = null, h
             if (!Array.isArray(t.nowHis) && textOf && selfNames[0]) {
                 const userRe = new RegExp(`^\\[${String(selfNames[0]).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]`, "i");
                 const hisLines = refs.map((c) => { try {
-                    return String(textOf(c) || "").split(/(?=\[[A-Za-z][A-Za-z0-9 _-]*\]\s*\()/).filter((seg) => userRe.test(seg)).map((seg) => seg.replace(/^\[[^\]]*\]\s*\([^)]*\)\s*:?/, "")).join(" ");
+                    return String(textOf(c) || "").split(SPEAKER_BOUNDARY).filter((seg) => userRe.test(seg)).map((seg) => seg.replace(/^\[[^\]]*\]\s*\([^)]*\)\s*:?/, "")).join(" ");
                 }
                 catch {
                     return "";
@@ -1723,11 +1744,12 @@ async function growWebInner({ root, mem, letter, ask, embed, inTime, minutesLeft
             }
         }
         let limit = maxHubsShown, mChars = momentChars, tooBig = false, splitNow = false, prompt = tapeWhy ? "" : await makePrompt(limit);
-        let got = null, answer = "", why = "";
+        const webSeed = (attempt) => (([...refl.map((x) => x.id).join(",")].reduce((h, ch) => (Math.imul(h, 31) + ch.charCodeAt(0)) | 0, 7) >>> 1) + attempt * 7919) % 2147483647;
+        let got = null, answer = "", why = "", acceptedAttempt = 0;
         for (let attempt = 1; attempt <= 2 && !got && !tapeWhy; attempt++) {
             beat(root);
             let finish = null, told = false;
-            const seed = (([...refl.map((x) => x.id).join(",")].reduce((h, ch) => (Math.imul(h, 31) + ch.charCodeAt(0)) | 0, 7) >>> 1) + attempt * 7919) % 2147483647;
+            const seed = webSeed(attempt);
             try {
                 const r = await ask(letter, prompt, { seed, attempt });
                 told = typeof r !== "string";
@@ -1766,6 +1788,7 @@ async function growWebInner({ root, mem, letter, ask, embed, inTime, minutesLeft
                 why = "cut off (the answer ended without finishing)";
             else if (p.nothing || p.threads.length || p.hubs.length) {
                 got = p;
+                acceptedAttempt = attempt;
                 why = "";
             }
             else {
@@ -1787,7 +1810,7 @@ async function growWebInner({ root, mem, letter, ask, embed, inTime, minutesLeft
         const rc = {};
         for (const c of moments)
             rc[ckey(c)] = [ckey(c)];
-        const ev = { t: Date.now(), from, to, day: to, placeCheck: 1, thenNow: 1, noNow: 1, tape, refl: refl.map((r) => r.id), ...(w.shownOf ? { shown: Object.fromEntries(refl.map((r, i) => [r.id, shows[i]])) } : {}), rc, moments, hubs: got?.hubs || [], threads: got?.threads || [], groups: got?.groups || [], skipped: got?.skipped || 0, vecs: {} };
+        let ev = { t: Date.now(), from, to, day: to, placeCheck: 1, thenNow: 1, noNow: 1, tape, refl: refl.map((r) => r.id), ...(w.shownOf ? { shown: Object.fromEntries(refl.map((r, i) => [r.id, shows[i]])) } : {}), rc, moments, hubs: got?.hubs || [], threads: got?.threads || [], groups: got?.groups || [], skipped: got?.skipped || 0, vecs: {} };
         const fresh = ev.hubs.filter((h) => /^new$/i.test(h.ref)).map((h) => h.name).filter(Boolean);
         if (fresh.length) {
             try {
@@ -1806,8 +1829,49 @@ async function growWebInner({ root, mem, letter, ask, embed, inTime, minutesLeft
         }
         catch { }
         ev.herN = (w.herIds || []).length;
-        const res = applyEvent(w, ev, { selfNames, known, herName, herNames, textOf: (c) => pieceWithSpeaker(root, mem, c.rel, c.key) });
-        if (got && !got.nothing && !res.threads && !res.made && !res.updated)
+        const options = { selfNames, known, herName, herNames, textOf: (c) => pieceWithSpeaker(root, mem, c.rel, c.key) };
+        const proposedLinks = got && !got.nothing ? linkProposals(answer) : [];
+        const canRepairLinks = proposedLinks.length > 0 && acceptedAttempt === 1 && inTime();
+        // Preview a repair-eligible batch so the journal is written once and rebuild applies it once.
+        const preview = canRepairLinks ? structuredClone(w) : w;
+        const previewEvent = canRepairLinks ? structuredClone(ev) : ev;
+        let res = applyEvent(preview, previewEvent, options);
+        if (canRepairLinks && !res.threads) {
+            const names = preview.hubs.slice(w.hubs.length).map((h) => `${h.id}: ${h.name}`);
+            const repairPrompt = `${prompt}\n\nEvery proposed LINK was rejected. Try the links once more, or write "nothing tonight".`
+                + ` Return only LINK stanzas. For example: LINK: NEW | first dot name or mark | second dot name or mark. Do not put a dot kind between the bars.`
+                + ` Cite only excerpt numbers 1 to ${moments.length}. Use the dots shown above or new dots accepted from your last answer.`
+                + `\nRejected LINK lines:\n${proposedLinks.join("\n").slice(0, 2000)}`
+                + (names.length ? `\nAccepted new dots:\n${names.join("\n")}` : "");
+            beat(root);
+            log(`her web: all ${proposedLinks.length} proposed links were refused; trying the links once more.`);
+            let repaired = null;
+            try {
+                const reply = await ask(letter, repairPrompt, { seed: webSeed(2), attempt: 2 });
+                const text = typeof reply === "string" ? reply : reply?.text || "";
+                if (typeof reply === "string" || (reply?.finish && reply.finish !== "length"))
+                    repaired = parseAnswer(text, moments.length);
+                if (reply?.promptTokens)
+                    biggestPrompt = Math.max(biggestPrompt, reply.promptTokens);
+            }
+            catch (e) {
+                log(`her web: link repair could not finish: ${e.message}`);
+            }
+            if (repaired?.threads.length) {
+                ev.threads = repaired.threads;
+                res = applyEvent(w, ev, options);
+            }
+            else {
+                w = preview;
+                ev = previewEvent;
+            }
+            log(`her web: link repair kept ${res.threads} links.`);
+        }
+        else {
+            w = preview;
+            ev = previewEvent;
+        }
+        if (got && !got.nothing && !res.threads && !res.made && !res.updated && !(proposedLinks.length && (canRepairLinks || acceptedAttempt === 2)))
             why = res.rejected ? "every line was refused by the guards" : "nothing in it could be used";
         if (why) {
             w.stats.why = w.stats.why || {};
@@ -1959,17 +2023,15 @@ function weightOf(l, today, sal = null) {
 }
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const activeDaysFile = (root) => join(root, "Mind", "web-active-days.sealed");
-const HEAD_DAY = /^\\?\u200B?\[[A-Za-z][A-Za-z0-9 _-]*\]\s*\(([A-Z][a-z]{2}) (\d{1,2}), (\d{4})[^)]*\):\s*$/gm;
-const MON3 = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12 };
 function saveActiveDays(root, mem, pieces) {
     const s = new Set(pieces.map((x) => x.day));
     for (const rel of new Set(pieces.map((x) => x.rel)))
         try {
-            const { text } = fileChunks(root, mem, rel), heads = [...text.matchAll(HEAD_DAY)];
-            if ((text.match(/^\\?\u200B?\[[A-Za-z][A-Za-z0-9 _-]*\]\s*:?\s*$/gm) || []).length > heads.length)
+            const { text } = fileChunks(root, mem, rel), heads = findTranscriptHeaders(text);
+            if (text.split(/\r?\n/).filter(isSpeakerHeading).length > heads.length)
                 continue;   // entry 287: undated messages; any dates inside belong to pasted older text (the pieces keep the file's date)
-            for (const m of heads)
-                if (MON3[m[1]]) s.add(`${m[3]}-${String(MON3[m[1]]).padStart(2, "0")}-${String(m[2]).padStart(2, "0")}`);
+            for (const { day } of heads)
+                s.add(day);
         }
         catch { }
     const days = [...s].filter((d) => DAY_RE.test(String(d))).sort();
@@ -2053,11 +2115,11 @@ export function personalizedPageRank(w, seeds, { damping = 0.5, iters = 30, toda
     }
     return p;
 }
-function seedsFor(w, about, qv) {
+function seedsFor(w, about, qv, excluded = null) {
     const n = norm(about);
     if (!n)
         return [];
-    const live = w.hubs.filter((h) => !w.aside.includes(h.id));
+    const live = w.hubs.filter((h) => !w.aside.includes(h.id) && !excluded?.has(h.id));
     const exact = live.filter((h) => [h.name, ...(h.aliases || [])].some((x) => norm(x) === n));
     if (exact.length)
         return exact.map((h) => h.id);
@@ -2270,7 +2332,8 @@ export async function webLinksFor(root, query, { embed = null, web = null } = {}
     if (!r)
         return [];
     const { w, asideR } = r, low = String(query || "").toLowerCase(), live = w.hubs.filter((h) => !w.aside.includes(h.id));
-    let seeds = live.filter((h) => [h.name, ...(h.aliases || [])].some((n) => nameIn(n, low))).map((h) => h.id);
+    const homographs = new Set();
+    let seeds = live.filter((h) => [h.name, ...(h.aliases || [])].some((n) => contextualNameIn(n, low, () => homographs.add(h.id)))).map((h) => h.id);
     if (!seeds.length) {
         let qv = null;
         if (embed) {
@@ -2279,7 +2342,7 @@ export async function webLinksFor(root, query, { embed = null, web = null } = {}
             }
             catch { }
         }
-        seeds = seedsFor(w, String(query), qv);
+        seeds = seedsFor(w, String(query), qv, homographs);
     }
     if (!seeds.length)
         return [];
@@ -2745,7 +2808,7 @@ export function webHint(root, text) {
             return "";
         const w = loadWeb(root), low = String(text || "").toLowerCase();
         w.aside ||= [];
-        const hits = w.hubs.filter((h) => !w.aside.includes(h.id) && [h.name, ...(h.aliases || [])].some((n) => nameIn(n, low)));
+        const hits = w.hubs.filter((h) => !w.aside.includes(h.id) && [h.name, ...(h.aliases || [])].some((n) => contextualNameIn(n, low)));
         const asideR = asideReflections(root);
         const withThreads = hits.map((h) => [h, w.links.filter((l) => !w.aside.includes(l.id) && liveHistory(l, asideR).length && (l.a === h.id || l.b === h.id))]).filter(([, ls]) => ls.length).sort((a, b) => b[1].length - a[1].length).slice(0, 3);
         if (!withThreads.length)

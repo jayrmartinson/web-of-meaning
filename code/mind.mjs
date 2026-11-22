@@ -9,12 +9,12 @@ import { seal, unseal } from "./seal.mjs";
 import { loadCards, cardKey, conversationFiles, fileChunks } from "./librarian.mjs";
 import { machineLike } from "./machine.mjs";
 import { wordsIn, hasNoSpaceScript } from "./lang.mjs";
+import { findTranscriptHeaders, isSpeakerHeading } from "./transcript.mjs";
 const pad = (n) => String(n).padStart(2, "0");
 const dayOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const label = (day) => { const [y, m, d] = day.split("-").map(Number); return `${MON[m - 1]} ${d}, ${y}`; };
 const span = (a, b) => (a === b ? label(a) : `${label(a)} to ${label(b)}`);
-const HEAD = /^\\?\u200B?\[([A-Za-z][A-Za-z0-9 _-]*)\]\s*\(([A-Z][a-z]{2}) (\d{1,2}), (\d{4})[^)]*\):\s*$/gm;
 const keyFile = (root) => join(root, "Vault", "mind-key.locked");
 const storeFile = (root) => join(root, "Mind", "mind.sealed");
 const keys = new Map();
@@ -70,16 +70,9 @@ export function moments(root, mem, only = null) {
         catch {
             continue;
         }
-        const marks = [];
-        HEAD.lastIndex = 0;
-        let m;
-        while ((m = HEAD.exec(text))) {
-            const mo = MON.indexOf(m[2]);
-            if (mo >= 0)
-                marks.push([m.index, `${m[4]}-${pad(mo + 1)}-${pad(Number(m[3]))}`]);
-        }
+        const marks = findTranscriptHeaders(text).map((h) => [h.index, h.day]);
         const fromName = (rel.match(/(\d{4}-\d{2}-\d{2})/) || [])[1] || null;
-        const plain = (text.match(/^\\?\u200B?\[[A-Za-z][A-Za-z0-9 _-]*\]\s*:?\s*$/gm) || []).length;
+        const plain = text.split(/\r?\n/).filter(isSpeakerHeading).length;
         if (plain > marks.length)
             marks.length = 0;
         let j = 0, cur = marks.length ? marks[0][1] : fromName;
