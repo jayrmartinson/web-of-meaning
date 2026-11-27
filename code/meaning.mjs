@@ -232,7 +232,7 @@ export function parseAnswer(answer, maxNum) {
             cur = null;
             const nums = [...new Set((String(c.bc || "").match(/\b\d+\b/g) || []).map(Number))].filter((n) => n >= 1 && n <= maxNum);
             const whereT = String(c.where || "").replace(/^["“'‘]+|["”'’]+$/g, "").trim();
-            const nowSame = /^\W*(the |still the |still )?(same|unchanged)( as then)?\W*$/i.test(String(c.now || ""));
+            const nowSame = /^\W*(the |still the |still )?(same|unchanged)( as then)?\W*$/i.test(String(c.now || "")) || isSameOther(String(c.now || "").toLowerCase().normalize("NFC").replace(/[^\p{L}\p{M}\p{N} ]+/gu, " ").replace(/\s+/g, " ").trim());
             threads.push({ a: c.a, b: c.b, kind: c.kind, feel: wordsOf(c.then), note: String(c.note || "").replace(/^[\s*_]+|[\s*_]+$/g, "").replace(/^["“]+|["”]+$/g, "").trim(), nums,
                 ...(whereT && !isNoneW(whereT) && !/^\(?\s*(only when|not a place|no place)/i.test(whereT) ? { where: whereT } : {}),
                 ...(c.theirs && !isNoneW(c.theirs) ? { theirs: String(c.theirs).slice(0, 160) } : {}), labeled: true, ...(c.now != null ? (nowSame ? { nowSame: true } : { feelNow: wordsOf(c.now) }) : {}) });
@@ -2026,11 +2026,12 @@ export function personalizedPageRank(w, seeds, { damping = 0.5, iters = 30, toda
         add(l.a, l.b, wt * (young.has(l.b) ? 0.25 : 1));
         add(l.b, l.a, wt * (young.has(l.a) ? 0.25 : 1));
     }
-    for (const g of w.hubs.filter((h) => h.type === "group"))
-        for (const mId of g.members || []) {
-            add(g.id, mId, 0.5);
-            add(mId, g.id, 0.5);
-        }
+    for (const g of w.hubs.filter((h) => h.type === "group" && !w.aside.includes(h.id)))
+        for (const mId of g.members || [])
+            if (!w.aside.includes(mId)) {
+                add(g.id, mId, 0.5);
+                add(mId, g.id, 0.5);
+            }
     const deg = new Map([...nbr].map(([u, list]) => [u, list.length]));
     const out = new Map();
     for (const [u, list] of nbr) {
@@ -2205,7 +2206,7 @@ export async function walkWeb(root, mem, args = {}, { embed = null } = {}) {
     }
     if (embed) {
         try {
-            [qv] = await embed([qText + (args.and ? " " + args.and : "")]);
+            [qv] = await embed([qText]);
         }
         catch { }
     }

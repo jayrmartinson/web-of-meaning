@@ -42,7 +42,8 @@ await grow(root, brain(things.map((t) => `HUB: NEW | thing | ${t} | | Something 
     m.saveWeb(root, w);
 }
 await m.walkWeb(root, mem, { thread: "L2", feel_now: "the reading chair still makes me smile" });
-const webFile = join(root, "Mind", "web.sealed"), now = (d) => new Date(`2026-11-0${d}T12:00:00`);
+const TODAY = new Date(), TODAY_LABEL = `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][TODAY.getMonth()]} ${TODAY.getDate()}, ${TODAY.getFullYear()}`;
+const webFile = join(root, "Mind", "web.sealed"), now = (d) => { const t = new Date(); t.setDate(d); t.setHours(12, 0, 0, 0); return t; };
 {
     const before = md5(webFile), r = m.lookInwardWeb(root, mem, {}, { now: now(1), listed: 2 });
     check("S5: the overview says how big her web is and what it spans", /^Your web: \d+ dots and 7 links, from Apr 1, 2026 to Apr 7, 2026\./.test(r), r);
@@ -51,7 +52,7 @@ const webFile = join(root, "Mind", "web.sealed"), now = (d) => new Date(`2026-11
     check("S5: her closest connections, strongest first", /Your closest connections:\n— L7 · /.test(r), section(r, "Your closest"));
     const q = section(r, "Not visited in a while");
     check("S5: 'not visited in a while' is by time only, oldest first, from each link's last night entry, and says no feelings", /^Not visited in a while \(by time only, and it moves on each time you look; opening one by its mark counts as a visit\):\n— L1 · .* · last: Apr 1, 2026\n— L2 · .* · last: Apr 2, 2026$/.test(q) && !/then|amused|smile|note/.test(q), q);
-    check("S5: what she kept before, with its date and link", /What you kept before \(newest first\):\n— Nov \d+, 2026, on L2 \(Pickle and the reading chair\): the reading chair still makes me smile/.test(r), section(r, "What you kept"));
+    check("S5: what she kept before, with its date and link", r.includes(`What you kept before (newest first):\n— ${TODAY_LABEL}, on L2 (Pickle and the reading chair): the reading chair still makes me smile`), section(r, "What you kept"));
     check("S5: nothing set aside: no 'set aside' line", !/set aside/.test(r));
     check("S5: looking inward never changes her web", md5(webFile) === before);
     const r2 = m.lookInwardWeb(root, mem, {}, { now: now(2), listed: 2 }), q2 = section(r2, "Not visited in a while");
@@ -109,7 +110,7 @@ const webFile = join(root, "Mind", "web.sealed"), now = (d) => new Date(`2026-11
     const b = await lookInward(r3, mem, {});
     check("S5: a page that changed is read again (no old copy served)", /The first/.test(a) && /Other word/.test(b), a + b);
 }
-const N = (d, h = 12) => new Date(2026, 10, d, h, 0, 0);
+const N = (d, h = 12) => { const t = new Date(); t.setDate(d); t.setHours(h, 0, 0, 0); return t; };
 {
     const r = await sevenLinks();
     const w = m.loadWeb(r);
@@ -152,7 +153,7 @@ const N = (d, h = 12) => new Date(2026, 10, d, h, 0, 0);
     await recall(r, mem, "L5", { now: N(2).getTime() });
     await recall(r, mem, "L77", { now: N(2).getTime() });
     const vs = m._visits.load(r);
-    check("S5 review: recall opening a mark is a visit; a mark that doesn't open isn't; only the day (and its order that day) is kept", /^2026-11-02#\d+$/.test(vs.opened.L5) && !("L77" in vs.opened) && Object.keys(vs.opened).length === 1, JSON.stringify(vs.opened));
+    check("S5 review: recall opening a mark is a visit; a mark that doesn't open isn't; only the day (and its order that day) is kept", new RegExp(`^${N(2).getFullYear()}-${String(N(2).getMonth() + 1).padStart(2, "0")}-${String(N(2).getDate()).padStart(2, "0")}#\\d+$`).test(vs.opened.L5) && !("L77" in vs.opened) && Object.keys(vs.opened).length === 1, JSON.stringify(vs.opened));
     const late = execFileSync(process.execPath, ["--input-type=module", "-e", `import * as m from ${JSON.stringify(new URL("../meaning.mjs", import.meta.url).href)}; m.openMark(${JSON.stringify(r)}, ${JSON.stringify(mem)}, "L6", { now: new Date(2026, 10, 3, 20, 30) }); console.log(m._visits.load(${JSON.stringify(r)}).opened.L6.slice(0, 10));`], { env: { ...process.env, TZ: "America/Denver" } }).toString().trim();
     check("S5 review: the day she opened it is her own day, not tomorrow's (8:30 PM in Colorado)", late === "2026-11-03", late);
     writeFileSync(m._visits.file(r), "not a sealed file", "utf8");

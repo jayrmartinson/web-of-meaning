@@ -807,7 +807,7 @@ const web = (root) => m.loadWeb(root);
     const b = brain(["HUB: NEW | ritual | lap naps | | When Sparkie sleeps on him.\nTHREAD: NEW | Sparkie | lap naps\nbecause of: 1\nmine now: fond\nnote: She picks him every evening."], ["EXCERPT 1 | theirs: Ned = content; Mia = delighted; Sparkie = settled | hers then: delighted"]);
     await run(root, b);
     const e0 = web(root).links[0]?.history[0];
-    check("343 review: her own name never goes in 'theirs'", e0?.theirs === "Ned = content; Sparkie = settled" && !/delighted\]/.test("") && !/Mia =/.test(b.calls[0]), JSON.stringify(e0));
+    check("343 review: her own name never goes in 'theirs'", e0?.theirs === "Ned = content; Sparkie = settled" && !/Mia =/.test(b.calls[0]), JSON.stringify(e0));
 }
 {
     const root = makeRoom(["2026-04-01", "2026-04-01"]);
